@@ -1,0 +1,20 @@
+{
+  "name": "libcurl.js",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "eslint tests",
+    "lint:fix": "eslint tests --fix",
+    "check": "tsc --noEmit",
+    "serve": "node tests/server.js",
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@antfu/eslint-config": "^6.7.3",
+    "@playwright/test": "^1.57.0",
+    "@types/node": "^25.0.7",
+    "eslint": "^9.39.2",
+    "express": "^5.2.1",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,0 +1,58 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/checkout@v6
+        with:
+          repository: emscripten-core/emsdk
+          path: emsdk
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.x
+
+      - name: Install node dependencies
+        run: |
+          npm i -g pnpm
+          pnpm i
+
+      - name: Lint
+        run: ./scripts/lint.sh
+
+      - name: Install emsdk
+        working-directory: emsdk
+        run: |
+          ./emsdk install latest
+          ./emsdk activate latest
+
+      - name: Build
+        run: |
+          . emsdk/emsdk_env.sh
+          emcmake cmake -B build -G Ninja \
+            -DCMAKE_INSTALL_PREFIX=/usr \
+            -DBUILD_TESTING=ON \
+            -DCMAKE_BUILD_TYPE=Debug # Enable sanitizers
+          cmake --build build
+          DESTDIR=$(pwd)/dist cmake --install build
+          cd dist && find .
+
+      - name: Run tests
+        run: |
+          npx playwright install
+          npx playwright install-deps
+          pnpm run test
+
+      - name: Setup tmate session
+        if: ${{ failure() }}
+        uses: mxschmitt/action-tmate@v3

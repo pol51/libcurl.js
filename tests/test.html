@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+  <body>
+    <script src="../build/tests/test.js"></script>
+    <script>
+      Module.onRuntimeInitialized = function() {
+        Module._prepare()
+        for (const args of [
+          [0, "http://localhost:3000/tests/timeout.json"],
+          [1, "http://localhost:3000/tests/success.json"],
+          [2, "http://localhost:3000/tests/failure.json"]
+        ]) {
+          Module.ccall("request", null, ["number", "string"], args)
+        }
+      }
+    </script>
+  </body>
+</html>
