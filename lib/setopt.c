@@ -27,6 +27,12 @@ CURLcode curl_easy_setopt(CURL *d, CURLoption tag, ...) {
   case CURLOPT_WRITEFUNCTION:
     data->set.fwrite_func = va_arg(arg, curl_write_callback);
     break;
+  case CURLOPT_HEADERDATA:
+    data->set.writeheader = va_arg(arg, void *);
+    break;
+  case CURLOPT_HEADERFUNCTION:
+    data->set.fwrite_header = va_arg(arg, curl_write_callback);
+    break;
   default:
     break;
   }

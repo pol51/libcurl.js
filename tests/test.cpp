@@ -60,11 +60,29 @@ static MultiContainer container;
 
 class CurlTest {
 public:
+  // Tags the userdata pointer so the shared callback knows whether it is
+  // receiving body bytes or a header line, and which test owns them.
+  struct Sink {
+    CurlTest *self;
+    bool isHeader;
+  };
+
   CurlTest() : curl_(curl_easy_init()) {
     curl_easy_setopt(curl_, CURLOPT_PRIVATE, this);
-    curl_easy_setopt(curl_, CURLOPT_WRITEDATA, this);
-    curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, staticWrite);
+    curl_easy_setopt(curl_, CURLOPT_WRITEDATA, &bodySink_);
+    curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, staticIo);
     curl_easy_setopt(curl_, CURLOPT_TIMEOUT, 1L);
+  }
+
+  // Register a dedicated header callback (CURLOPT_HEADERFUNCTION).
+  void useExplicitHeaders() {
+    curl_easy_setopt(curl_, CURLOPT_HEADERFUNCTION, staticIo);
+    curl_easy_setopt(curl_, CURLOPT_HEADERDATA, &headerSink_);
+  }
+
+  // Set only CURLOPT_HEADERDATA: headers must fall back to the write callback.
+  void useFallbackHeaders() {
+    curl_easy_setopt(curl_, CURLOPT_HEADERDATA, &headerSink_);
   }
 
   void request(const std::string &url) {
@@ -75,21 +93,30 @@ public:
   ~CurlTest() { curl_easy_cleanup(curl_); }
 
 private:
-  static size_t staticWrite(char *ptr, size_t size, size_t nmemb,
-                            void *userdata) {
-    CurlTest *self = static_cast<CurlTest *>(userdata);
-    return self->write(ptr, size, nmemb);
+  static size_t staticIo(char *ptr, size_t size, size_t nmemb, void *userdata) {
+    Sink *sink = static_cast<Sink *>(userdata);
+    return sink->self->io(ptr, size, nmemb, sink->isHeader);
   }
 
-  size_t write(char *ptr, size_t size, size_t nmemb) {
+  size_t io(char *ptr, size_t size, size_t nmemb, bool isHeader) {
     auto total = size * nmemb;
-    data_.insert(data_.end(), ptr, ptr + total);
-    std::cout << data_;
+    if (isHeader) {
+      std::string line(ptr, total);
+      while (!line.empty() && (line.back() == '\r' || line.back() == '\n')) {
+        line.pop_back();
+      }
+      std::cout << "HDR:" << line << std::endl;
+    } else {
+      data_.insert(data_.end(), ptr, ptr + total);
+      std::cout << data_;
+    }
     return total;
   }
 
   CURL *curl_;
   std::string data_;
+  Sink bodySink_{this, false};
+  Sink headerSink_{this, true};
 };
 
 static std::vector<CurlTest> tests(3);
@@ -105,6 +132,15 @@ EMSCRIPTEN_KEEPALIVE void prepare() {
 }
 
 EMSCRIPTEN_KEEPALIVE void request(int index, const char *url) {
+  // index 1 (success / 200) exercises CURLOPT_HEADERFUNCTION directly.
+  // index 2 (failure / 404) sets only CURLOPT_HEADERDATA, exercising the
+  // fallback to the write callback as well as header delivery on an error
+  // status. index 0 (timeout / status 0) should yield no header lines.
+  if (index == 2) {
+    tests[index].useFallbackHeaders();
+  } else {
+    tests[index].useExplicitHeaders();
+  }
   tests[index].request(url);
 }
 }

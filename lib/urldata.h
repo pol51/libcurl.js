@@ -14,6 +14,8 @@ struct UrlState {
 struct UserDefined {
   void *out;
   curl_write_callback fwrite_func;
+  curl_write_callback fwrite_header;
+  void *writeheader;
   void *private_data;
   unsigned int timeout;
 };

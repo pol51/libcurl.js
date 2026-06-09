@@ -24,6 +24,18 @@ test('curl', async ({ page }) => {
   expect(messages.indexOf('HTTP code: 0'), 'Got timeout').toBeGreaterThan(0)
   expect(messages.indexOf(success), 'Got success.json').toBeGreaterThan(0)
   expect(messages.indexOf(timeout), 'Lost timeout.json').toBe(-1)
+  // CURLOPT_HEADERFUNCTION: synthesized status line is delivered first (200).
+  expect(messages.some(m => m.startsWith('HDR:HTTP/1.1 200')), 'header status line (200)').toBe(true)
+  // Real response headers are delivered one line per callback invocation.
+  expect(messages.some(m => m.toLowerCase().startsWith('hdr:content-type')), 'content-type header line').toBe(true)
+  // The trailing blank line terminates the header block.
+  expect(messages.includes('HDR:'), 'trailing blank header line').toBe(true)
+  // Fallback: HEADERDATA-only routes header lines to the write callback, and
+  // headers are delivered even on an error status (404).
+  expect(messages.some(m => m.startsWith('HDR:HTTP/1.1 404')), 'fallback header status line (404)').toBe(true)
+  // A transfer with no response (timeout, status 0) delivers no header lines.
+  expect(messages.some(m => m.startsWith('HDR:HTTP/1.1 0')), 'no headers on timeout').toBe(false)
+
   expect(messages[messages.length - 2], 'All handles cleaned up').toBe('Remaining handles: 0')
   expect(messages[messages.length - 1], 'Completed all requests').toBe('Completed requests: 3')
 })

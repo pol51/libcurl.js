@@ -14,11 +14,67 @@ CURLM *curl_multi_init(void) {
   return multi;
 }
 
+/* Deliver the response headers to the callback set with
+   CURLOPT_HEADERFUNCTION, mirroring curl: one invocation for the status line,
+   one per response header line, and one for the trailing blank line. If
+   HEADERFUNCTION is unset but HEADERDATA is set, header lines fall back to the
+   CURLOPT_WRITEFUNCTION callback. Nothing is delivered when no response was
+   received (e.g. a timeout, where status is 0). */
+static void deliver_headers(Curl_easy *handle, emscripten_fetch_t *fetch) {
+  if (fetch->status == 0) {
+    return;
+  }
+
+  curl_write_callback cb = handle->set.fwrite_header;
+  void *userdata = handle->set.writeheader;
+  if (cb == NULL) {
+    if (userdata == NULL) {
+      return;
+    }
+    cb = handle->set.fwrite_func;
+  }
+  if (cb == NULL) {
+    return;
+  }
+
+  /* The HTTP version is not exposed by the Fetch API, so it is hardcoded. */
+  char status_line[128];
+  int n = snprintf(status_line, sizeof(status_line), "HTTP/1.1 %d %s\r\n",
+                   (int)fetch->status, fetch->statusText);
+  if (n > 0) {
+    cb(status_line, (size_t)n, 1, userdata);
+  }
+
+  size_t len = emscripten_fetch_get_response_headers_length(fetch);
+  if (len > 0) {
+    char *buf = malloc(len + 1);
+    if (buf) {
+      emscripten_fetch_get_response_headers(fetch, buf, len + 1);
+      char *line = buf;
+      while (*line) {
+        char *eol = strchr(line, '\n');
+        size_t linelen = eol ? (size_t)(eol - line + 1) : strlen(line);
+        cb(line, linelen, 1, userdata);
+        if (!eol) {
+          break;
+        }
+        line = eol + 1;
+      }
+      free(buf);
+    }
+  }
+
+  cb((char *)"\r\n", 2, 1, userdata);
+}
+
 void process_result(emscripten_fetch_t *fetch) {
   Curl_easy *handle = fetch->userData;
   struct Curl_multi *multi = handle->state.multi;
 
   handle->info.httpcode = fetch->status;
+
+  deliver_headers(handle, fetch);
+
   if (fetch->status == 200) {
     handle->set.fwrite_func((char *)fetch->data, fetch->numBytes, 1,
                             handle->set.out);
