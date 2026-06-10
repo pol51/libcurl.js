@@ -90,6 +90,11 @@ public:
     curl_multi_add_handle(container.multi_, curl_);
   }
 
+  void request(const std::string &url, const std::string &range) {
+    curl_easy_setopt(curl_, CURLOPT_RANGE, range.c_str());
+    request(url);
+  }
+
   ~CurlTest() { curl_easy_cleanup(curl_); }
 
 private:
@@ -119,7 +124,7 @@ private:
   Sink headerSink_{this, true};
 };
 
-static std::vector<CurlTest> tests(3);
+static std::vector<CurlTest> tests(4);
 
 extern "C" {
 EMSCRIPTEN_KEEPALIVE void prepare() {
@@ -142,5 +147,10 @@ EMSCRIPTEN_KEEPALIVE void request(int index, const char *url) {
     tests[index].useExplicitHeaders();
   }
   tests[index].request(url);
+}
+
+EMSCRIPTEN_KEEPALIVE void request_range(int index, const char *url,
+                                        const char *range) {
+  tests[index].request(url, range);
 }
 }

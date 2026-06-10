@@ -9,6 +9,7 @@ CURL *curl_easy_init(void) { return calloc(1, sizeof(Curl_easy)); }
 
 void curl_easy_cleanup(CURL *ptr) {
   free(((Curl_easy *)ptr)->state.url);
+  free(((Curl_easy *)ptr)->set.range);
   free(ptr);
 }
 

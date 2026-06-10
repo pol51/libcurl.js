@@ -22,6 +22,8 @@ test('curl', async ({ page }) => {
   expect(messages.indexOf('HTTP code: 200'), 'Got 200').toBeGreaterThan(0)
   expect(messages.indexOf('HTTP code: 404'), 'Got 404').toBeGreaterThan(0)
   expect(messages.indexOf('HTTP code: 0'), 'Got timeout').toBeGreaterThan(0)
+  expect(messages.indexOf('HTTP code: 206'), 'Got 206 partial content').toBeGreaterThan(0)
+  expect(messages.indexOf('"success" }'), 'Got partial body from range request').toBeGreaterThan(0)
   expect(messages.indexOf(success), 'Got success.json').toBeGreaterThan(0)
   expect(messages.indexOf(timeout), 'Lost timeout.json').toBe(-1)
   // CURLOPT_HEADERFUNCTION: synthesized status line is delivered first (200).
@@ -37,5 +39,5 @@ test('curl', async ({ page }) => {
   expect(messages.some(m => m.startsWith('HDR:HTTP/1.1 0')), 'no headers on timeout').toBe(false)
 
   expect(messages[messages.length - 2], 'All handles cleaned up').toBe('Remaining handles: 0')
-  expect(messages[messages.length - 1], 'Completed all requests').toBe('Completed requests: 3')
+  expect(messages[messages.length - 1], 'Completed all requests').toBe('Completed requests: 4')
 })

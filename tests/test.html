@@ -12,6 +12,7 @@
         ]) {
           Module.ccall("request", null, ["number", "string"], args)
         }
+        Module.ccall("request_range", null, ["number", "string", "string"], [3, "http://localhost:3000/tests/success.json", "13-24"])
       }
     </script>
   </body>

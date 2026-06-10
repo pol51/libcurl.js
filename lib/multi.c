@@ -75,7 +75,7 @@ void process_result(emscripten_fetch_t *fetch) {
 
   deliver_headers(handle, fetch);
 
-  if (fetch->status == 200) {
+  if (fetch->status == 200 || fetch->status == 206) {
     handle->set.fwrite_func((char *)fetch->data, fetch->numBytes, 1,
                             handle->set.out);
   }
@@ -98,7 +98,22 @@ CURLMcode curl_multi_add_handle(CURLM *m, CURL *d) {
   strcpy(attr.requestMethod, "GET");
   attr.onsuccess = process_result;
   attr.onerror = process_result;
-  emscripten_fetch(&attr, handle->state.url);
+
+  // emscripten reads requestHeaders synchronously during emscripten_fetch, so
+  // the stack array and heap value below stay valid for the duration of the
+  // call and can be freed immediately afterwards.
+  char *range_value = NULL;
+  if (handle->set.range) {
+    size_t len = strlen("bytes=") + strlen(handle->set.range) + 1;
+    range_value = malloc(len);
+    snprintf(range_value, len, "bytes=%s", handle->set.range);
+    const char *headers[] = {"Range", range_value, NULL};
+    attr.requestHeaders = headers;
+    emscripten_fetch(&attr, handle->state.url);
+    free(range_value);
+  } else {
+    emscripten_fetch(&attr, handle->state.url);
+  }
   return CURLM_OK;
 }
 
@@ -119,7 +134,9 @@ CURLMsg *curl_multi_info_read(CURLM *m, int *msgs_in_queue) {
   msg.msg = CURLMSG_DONE;
   msg.easy_handle = handle;
   msg.data.result =
-      handle->info.httpcode == 200 ? CURLE_OK : CURLE_HTTP_RETURNED_ERROR;
+      (handle->info.httpcode == 200 || handle->info.httpcode == 206)
+          ? CURLE_OK
+          : CURLE_HTTP_RETURNED_ERROR;
   return &msg;
 }
 

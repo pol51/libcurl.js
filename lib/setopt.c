@@ -21,6 +21,10 @@ CURLcode curl_easy_setopt(CURL *d, CURLoption tag, ...) {
     free(data->state.url);
     data->state.url = strdup(va_arg(arg, char *));
     break;
+  case CURLOPT_RANGE:
+    free(data->set.range);
+    data->set.range = strdup(va_arg(arg, char *));
+    break;
   case CURLOPT_PRIVATE:
     data->set.private_data = va_arg(arg, void *);
     break;

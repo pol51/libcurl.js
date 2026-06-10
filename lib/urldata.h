@@ -18,6 +18,7 @@ struct UserDefined {
   void *writeheader;
   void *private_data;
   unsigned int timeout;
+  char *range;
 };
 
 typedef struct {
