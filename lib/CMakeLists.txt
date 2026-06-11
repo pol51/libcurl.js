@@ -3,6 +3,7 @@ add_library(curl
     escape.c
     multi.c
     setopt.c
+    slist.c
     util.cpp
 )
 

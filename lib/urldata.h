@@ -19,6 +19,7 @@ struct UserDefined {
   void *private_data;
   unsigned int timeout;
   char *range;
+  struct curl_slist *headers;
 };
 
 typedef struct {

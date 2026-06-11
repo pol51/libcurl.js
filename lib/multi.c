@@ -100,20 +100,90 @@ CURLMcode curl_multi_add_handle(CURLM *m, CURL *d) {
   attr.onerror = process_result;
 
   // emscripten reads requestHeaders synchronously during emscripten_fetch, so
-  // the stack array and heap value below stay valid for the duration of the
-  // call and can be freed immediately afterwards.
-  char *range_value = NULL;
-  if (handle->set.range) {
-    size_t len = strlen("bytes=") + strlen(handle->set.range) + 1;
-    range_value = malloc(len);
-    snprintf(range_value, len, "bytes=%s", handle->set.range);
-    const char *headers[] = {"Range", range_value, NULL};
-    attr.requestHeaders = headers;
-    emscripten_fetch(&attr, handle->state.url);
-    free(range_value);
-  } else {
-    emscripten_fetch(&attr, handle->state.url);
+  // the allocations below stay valid for the duration of the call and can be
+  // freed immediately afterwards. requestHeaders is a NULL-terminated array of
+  // name/value string pairs, so each "Name: value" line from CURLOPT_HTTPHEADER
+  // is split on its first colon. CURLOPT_RANGE contributes a synthesized
+  // "Range: bytes=..." header.
+  size_t count = 0;
+  for (struct curl_slist *h = handle->set.headers; h; h = h->next) {
+    count++;
   }
+  if (handle->set.range) {
+    count++;
+  }
+
+  const char **headers = NULL;
+  char **lines = NULL; // copies we split in place and free after the fetch
+  char *range_value = NULL;
+  size_t nlines = 0;
+
+  if (count > 0) {
+    headers = malloc((count * 2 + 1) * sizeof(*headers));
+    lines = malloc(count * sizeof(*lines));
+    size_t i = 0;
+
+    for (struct curl_slist *h = handle->set.headers; h; h = h->next) {
+      char *line = strdup(h->data);
+      lines[nlines++] = line;
+
+      char *colon = strchr(line, ':');
+      const char *value;
+      if (colon) {
+        *colon = '\0';
+        value = colon + 1;
+        while (*value == ' ' || *value == '\t') {
+          value++;
+        }
+        if (*value == '\0') {
+          // "Name:" with an empty value disables the header (curl removes the
+          // matching internal header). There is no internal header here, so it
+          // simply is not sent.
+          continue;
+        }
+      } else {
+        // No colon: a line of the form "Name;" sends an empty header, e.g.
+        // "X-Foo;" yields "X-Foo:" with no value. Anything else without a
+        // colon is not a valid header line and is skipped.
+        char *semicolon = strchr(line, ';');
+        if (semicolon == NULL) {
+          continue;
+        }
+        char *rest = semicolon + 1;
+        while (*rest == ' ' || *rest == '\t') {
+          rest++;
+        }
+        if (*rest != '\0') {
+          continue;
+        }
+        *semicolon = '\0';
+        value = "";
+      }
+
+      headers[i++] = line;
+      headers[i++] = value;
+    }
+
+    if (handle->set.range) {
+      size_t len = strlen("bytes=") + strlen(handle->set.range) + 1;
+      range_value = malloc(len);
+      snprintf(range_value, len, "bytes=%s", handle->set.range);
+      headers[i++] = "Range";
+      headers[i++] = range_value;
+    }
+
+    headers[i] = NULL;
+    attr.requestHeaders = headers;
+  }
+
+  emscripten_fetch(&attr, handle->state.url);
+
+  for (size_t j = 0; j < nlines; j++) {
+    free(lines[j]);
+  }
+  free(lines);
+  free(range_value);
+  free(headers);
   return CURLM_OK;
 }
 

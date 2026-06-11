@@ -19,6 +19,12 @@ typedef size_t (*curl_write_callback)(char *buffer,
                                       size_t nitems,
                                       void *outstream);
 
+/* linked-list structure for the CURLOPT_HTTPHEADER option (and others) */
+struct curl_slist {
+  char *data;
+  struct curl_slist *next;
+};
+
 /* All possible error codes from all sorts of curl functions. Future versions
    may return other values, stay prepared.
 
@@ -1330,6 +1336,11 @@ typedef enum {
 char *curl_escape(const char *string, int length);
 
 void curl_free(void *p);
+
+struct curl_slist *curl_slist_append(struct curl_slist *list,
+                                     const char *data);
+
+void curl_slist_free_all(struct curl_slist *list);
 
 CURLcode curl_global_init(long flags);
 

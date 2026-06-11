@@ -13,6 +13,10 @@
           Module.ccall("request", null, ["number", "string"], args)
         }
         Module.ccall("request_range", null, ["number", "string", "string"], [3, "http://localhost:3000/tests/success.json", "13-24"])
+        Module.ccall("add_header", null, ["number", "string"], [4, "X-Custom-Header: libcurl-js-rocks"])
+        Module.ccall("add_header", null, ["number", "string"], [4, "X-Empty-Header;"])
+        Module.ccall("add_header", null, ["number", "string"], [4, "X-Removed-Header:"])
+        Module.ccall("request_headers", null, ["number", "string"], [4, "http://localhost:3000/tests/echo"])
       }
     </script>
   </body>

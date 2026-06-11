@@ -95,7 +95,22 @@ public:
     request(url);
   }
 
-  ~CurlTest() { curl_easy_cleanup(curl_); }
+  // Append a custom request header line ("Name: value") to the list that will
+  // be sent via CURLOPT_HTTPHEADER. The list is owned by the caller, so it is
+  // freed in the destructor.
+  void addHeader(const std::string &header) {
+    headers_ = curl_slist_append(headers_, header.c_str());
+  }
+
+  void requestWithHeaders(const std::string &url) {
+    curl_easy_setopt(curl_, CURLOPT_HTTPHEADER, headers_);
+    request(url);
+  }
+
+  ~CurlTest() {
+    curl_easy_cleanup(curl_);
+    curl_slist_free_all(headers_);
+  }
 
 private:
   static size_t staticIo(char *ptr, size_t size, size_t nmemb, void *userdata) {
@@ -122,9 +137,10 @@ private:
   std::string data_;
   Sink bodySink_{this, false};
   Sink headerSink_{this, true};
+  struct curl_slist *headers_ = nullptr;
 };
 
-static std::vector<CurlTest> tests(4);
+static std::vector<CurlTest> tests(5);
 
 extern "C" {
 EMSCRIPTEN_KEEPALIVE void prepare() {
@@ -152,5 +168,14 @@ EMSCRIPTEN_KEEPALIVE void request(int index, const char *url) {
 EMSCRIPTEN_KEEPALIVE void request_range(int index, const char *url,
                                         const char *range) {
   tests[index].request(url, range);
+}
+
+EMSCRIPTEN_KEEPALIVE void add_header(int index, const char *header) {
+  tests[index].addHeader(header);
+}
+
+EMSCRIPTEN_KEEPALIVE void request_headers(int index, const char *url) {
+  tests[index].useExplicitHeaders();
+  tests[index].requestWithHeaders(url);
 }
 }

@@ -37,7 +37,14 @@ test('curl', async ({ page }) => {
   expect(messages.some(m => m.startsWith('HDR:HTTP/1.1 404')), 'fallback header status line (404)').toBe(true)
   // A transfer with no response (timeout, status 0) delivers no header lines.
   expect(messages.some(m => m.startsWith('HDR:HTTP/1.1 0')), 'no headers on timeout').toBe(false)
+  // CURLOPT_HTTPHEADER: the custom request header reaches the server, which
+  // reflects it back in the X-Echo-Custom response header.
+  expect(messages.some(m => m.toLowerCase().startsWith('hdr:x-echo-custom: libcurl-js-rocks')), 'custom request header sent').toBe(true)
+  // A "Name;" line sends the header with an empty value (curl semicolon form).
+  expect(messages.some(m => m.toLowerCase().startsWith('hdr:x-echo-empty: present')), 'semicolon header sent with empty value').toBe(true)
+  // A "Name:" line with an empty value suppresses the header entirely.
+  expect(messages.some(m => m.toLowerCase().startsWith('hdr:x-echo-removed: absent')), 'empty-value header suppressed').toBe(true)
 
   expect(messages[messages.length - 2], 'All handles cleaned up').toBe('Remaining handles: 0')
-  expect(messages[messages.length - 1], 'Completed all requests').toBe('Completed requests: 4')
+  expect(messages[messages.length - 1], 'Completed all requests').toBe('Completed requests: 5')
 })
